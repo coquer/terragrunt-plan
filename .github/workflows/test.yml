@@ -28,50 +28,48 @@ jobs:
 
       - name: Create test log fixture
         run: |
-          cat > /tmp/tg-plan-test.txt << 'EOF'
-          21:58:59.842 INFO   [network/private-dns-zone-virtual-network-link/acr-aks/test] terraform: any changes that are required for your infrastructure. All Terraform commands
-          21:58:59.842 INFO   [network/private-dns-zone-virtual-network-link/acr-aks/test] terraform: should now work.
-          21:58:59.883 STDOUT [messaging/service-buses/consumption/queues] terraform: Terraform used the selected providers to generate the following execution
-          21:58:59.883 STDOUT [messaging/service-buses/consumption/queues] terraform: plan. Resource actions are indicated with the following symbols:
-          21:58:59.883 STDOUT [messaging/service-buses/consumption/queues] terraform:   ~ update in-place
-          21:58:59.883 STDOUT [messaging/service-buses/consumption/queues] terraform: Terraform will perform the following actions:
-          21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:   # azurerm_servicebus_queue.this["export_queue"] will be updated in-place
-          21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:   ~ resource "azurerm_servicebus_queue" "this" {
-          21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:       ~ lock_duration = "PT5M" -> "PT10M"
-          21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:         name          = "export_queue"
-          21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:         # (16 unchanged attributes hidden)
-          21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:     }
-          21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform: Plan: 0 to add, 1 to change, 0 to destroy.
-          21:59:10.179 STDOUT [network/dns-ns-records/dev-commercial-solutions-andel-dk] terraform: No changes. Your infrastructure matches the configuration.
-          21:59:10.179 STDOUT [network/dns-ns-records/dev-commercial-solutions-andel-dk] terraform: Terraform has compared your real infrastructure against your configuration
-          21:59:10.179 STDOUT [network/dns-ns-records/dev-commercial-solutions-andel-dk] terraform: and found no differences, so no changes are needed.
-          21:59:10.179 STDOUT [network/dns-ns-records/dev-commercial-solutions-andel-dk] terraform: Plan: 0 to add, 0 to change, 0 to destroy.
-          21:59:10.355 STDOUT [key-vault/vault-access-policies/vpn] terraform: No changes. Your infrastructure matches the configuration.
-          21:59:10.355 STDOUT [key-vault/vault-access-policies/vpn] terraform: Plan: 0 to add, 0 to change, 0 to destroy.
-          EOF
+          # Plan: summary on STDOUT (common case)
+          printf '%s\n' \
+            '21:58:59.842 INFO   [network/init-only] terraform: should now work.' \
+            '21:58:59.883 STDOUT [messaging/service-buses/consumption/queues] terraform: Terraform will perform the following actions:' \
+            '21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:   # azurerm_servicebus_queue.this["export_queue"] will be updated in-place' \
+            '21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:   ~ resource "azurerm_servicebus_queue" "this" {' \
+            '21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:       ~ lock_duration = "PT5M" -> "PT10M"' \
+            '21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform:     }' \
+            '21:58:59.884 STDOUT [messaging/service-buses/consumption/queues] terraform: Plan: 0 to add, 1 to change, 0 to destroy.' \
+            '21:59:00.000 STDOUT [node-pools/market-mobility-pool] terraform: Terraform will perform the following actions:' \
+            '21:59:00.001 STDOUT [node-pools/market-mobility-pool] terraform:   + resource "azurerm_kubernetes_cluster_node_pool" "this" {' \
+            '21:59:00.001 STDOUT [node-pools/market-mobility-pool] terraform:       + name = "marketpool4"' \
+            '21:59:00.001 STDOUT [node-pools/market-mobility-pool] terraform:     }' \
+            '21:59:00.002 STDERR [node-pools/market-mobility-pool] terraform: Plan: 1 to add, 0 to change, 0 to destroy.' \
+            '21:59:10.179 STDOUT [network/dns-ns-records/no-change] terraform: No changes. Your infrastructure matches the configuration.' \
+            '21:59:10.179 STDOUT [network/dns-ns-records/no-change] terraform: Plan: 0 to add, 0 to change, 0 to destroy.' \
+            > /tmp/tg-plan-test.txt
 
       - name: Run action
         id: diff
         uses: ./
         with:
-          log_file: "/tmp/tg-plan-test.txt"
-          mode: "summary"
+          log_file: '/tmp/tg-plan-test.txt'
+          mode: 'summary'
 
       - name: Verify outputs
         run: |
           echo "has_changes: ${{ steps.diff.outputs.has_changes }}"
           echo "changes_json: ${{ steps.diff.outputs.changes_json }}"
 
-          # messaging/service-buses has 1 change — must appear
           [[ "${{ steps.diff.outputs.has_changes }}" == "true" ]] || (echo "FAIL: expected has_changes=true" && exit 1)
 
-          echo '${{ steps.diff.outputs.changes_json }}' | jq -e 'length == 1'
-          echo '${{ steps.diff.outputs.changes_json }}' | jq -e '.[0].module == "messaging/service-buses/consumption/queues"'
-          echo '${{ steps.diff.outputs.changes_json }}' | jq -e '.[0].toChange == 1'
-          echo '${{ steps.diff.outputs.changes_json }}' | jq -e '.[0].toAdd == 0'
-          echo '${{ steps.diff.outputs.changes_json }}' | jq -e '.[0].toDestroy == 0'
+          # both modules with changes must appear
+          echo '${{ steps.diff.outputs.changes_json }}' | jq -e 'length == 2'
 
-          # no-change modules must not appear
-          echo '${{ steps.diff.outputs.changes_json }}' | jq -e 'map(.module) | contains(["network/dns-ns-records/dev-commercial-solutions-andel-dk"]) | not'
+          # messaging: Plan on STDOUT
+          echo '${{ steps.diff.outputs.changes_json }}' | jq -e 'map(select(.module == "messaging/service-buses/consumption/queues")) | .[0].toChange == 1'
+
+          # node-pools: Plan on STDERR — this is the case that was broken
+          echo '${{ steps.diff.outputs.changes_json }}' | jq -e 'map(select(.module == "node-pools/market-mobility-pool")) | .[0].toAdd == 1'
+
+          # no-change module must not appear
+          echo '${{ steps.diff.outputs.changes_json }}' | jq -e 'map(.module) | contains(["network/dns-ns-records/no-change"]) | not'
 
           echo "All assertions passed"

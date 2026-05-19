@@ -20,6 +20,10 @@ outputs:
   changes_json:
     description: 'JSON array: [{ "module": "...", "toAdd": 0, "toChange": 1, "toDestroy": 0 }]'
 
+branding:
+  icon: 'layers'
+  color: 'purple'
+
 runs:
   using: "node24"
   main: "dist/index.js"

@@ -4,27 +4,36 @@ import fs from "node:fs";
 
 const LINE_RE =
   /^\d{2}:\d{2}:\d{2}\.\d{3} (STDOUT|INFO|STDERR|WARN)\s+\[([^\]]+)\] terraform: ?(.*)$/;
+
 const PLAN_SUMMARY_RE =
-  /^Plan: (\d+) to add, (\d+) to change, (\d+) to destroy\.$/;
+  /Plan:\s+(\d+)\s+to add,\s+(\d+)\s+to change,\s+(\d+)\s+to destroy/;
 
 const PR_COMMENT_MARKER = "<!-- terragrunt-diff -->";
 
 function parseLog(raw) {
+  const moduleAll = new Map();
   const moduleStdout = new Map();
 
-  for (const line of raw.split("\n")) {
+  for (const line of raw.replace(/\r/g, "").split("\n")) {
     const m = line.match(LINE_RE);
     if (!m) continue;
     const [, level, module, content] = m;
-    if (level !== "STDOUT") continue;
-    if (!moduleStdout.has(module)) moduleStdout.set(module, []);
-    moduleStdout.get(module).push(content);
+    const trimmed = content.trim();
+
+    if (level === "STDOUT" || level === "STDERR") {
+      if (!moduleAll.has(module)) moduleAll.set(module, []);
+      moduleAll.get(module).push(trimmed);
+    }
+    if (level === "STDOUT") {
+      if (!moduleStdout.has(module)) moduleStdout.set(module, []);
+      moduleStdout.get(module).push(trimmed);
+    }
   }
 
   const changed = [];
 
-  for (const [module, lines] of moduleStdout) {
-    const summaryLine = lines.find((l) => PLAN_SUMMARY_RE.test(l));
+  for (const [module, allLines] of moduleAll) {
+    const summaryLine = allLines.find((l) => PLAN_SUMMARY_RE.test(l));
     if (!summaryLine) continue;
 
     const [, add, change, destroy] = summaryLine.match(PLAN_SUMMARY_RE);
@@ -34,14 +43,15 @@ function parseLog(raw) {
 
     if (toAdd === 0 && toChange === 0 && toDestroy === 0) continue;
 
-    const startIdx = lines.findIndex((l) =>
+    const stdoutLines = moduleStdout.get(module) || allLines;
+    const startIdx = stdoutLines.findIndex((l) =>
       l.startsWith("Terraform will perform the following actions:"),
     );
-    const endIdx = lines.findIndex((l) => PLAN_SUMMARY_RE.test(l));
+    const endIdx = stdoutLines.findIndex((l) => PLAN_SUMMARY_RE.test(l));
     const planBody =
       startIdx !== -1 && endIdx !== -1
-        ? lines.slice(startIdx, endIdx + 1).join("\n")
-        : lines.join("\n");
+        ? stdoutLines.slice(startIdx, endIdx + 1).join("\n")
+        : stdoutLines.join("\n");
 
     changed.push({ module, toAdd, toChange, toDestroy, planBody });
   }
@@ -129,12 +139,9 @@ async function run() {
     await core.summary.addRaw(markdown).write();
   }
 
-  if ((mode === "comment" || mode === "both") && token) {
-    if (!github.context.payload.pull_request) {
-      core.warning("Not a PR context — skipping PR comment");
-      return;
-    }
+  const hasPR = !!github.context.payload.pull_request;
 
+  if ((mode === "comment" || mode === "both") && token && hasPR) {
     const octokit = github.getOctokit(token);
     const { owner, repo } = github.context.repo;
     const prNumber = github.context.payload.pull_request.number;
