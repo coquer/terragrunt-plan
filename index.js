@@ -9,12 +9,13 @@ const PLAN_SUMMARY_RE =
   /Plan:\s+(\d+)\s+to add,\s+(\d+)\s+to change,\s+(\d+)\s+to destroy/;
 
 const PR_COMMENT_MARKER = "<!-- terragrunt-diff -->";
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 function parseLog(raw) {
   const moduleAll = new Map();
   const moduleStdout = new Map();
 
-  for (const line of raw.replace(/\r/g, "").split("\n")) {
+  for (const line of raw.replace(/\r/g, "").replace(ANSI_RE, "").split("\n")) {
     const m = line.match(LINE_RE);
     if (!m) continue;
     const [, level, module, content] = m;
