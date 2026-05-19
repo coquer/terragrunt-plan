@@ -1,0 +1,40 @@
+name: Terragrunt Plan
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup terragrunt
+        uses: gruntwork-io/terragrunt-action@v2
+        with:
+          tf_version: "latest"
+          tg_version: "latest"
+
+      - name: Plan all
+        id: plan
+        run: |
+          echo "machine github.com login x password ${GITHUB_TOKEN}" > ~/.netrc
+          terragrunt run --all plan 2>&1 | tee /tmp/tg-plan.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        working-directory: northeurope
+
+      - name: Parse and post plan summary
+        uses: your-org/terragrunt-diff@v1
+        with:
+          log_file: "/tmp/tg-plan.txt"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          mode: "both"

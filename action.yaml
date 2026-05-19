@@ -1,0 +1,25 @@
+name: "Terragrunt Plan Parser"
+description: "Parses terragrunt run-all plan output into a clean summary table and optional PR comment"
+
+inputs:
+  log_file:
+    description: "Path to file containing the full terragrunt run-all plan output"
+    required: true
+  token:
+    description: "GitHub token — required for PR comment mode"
+    required: false
+    default: ""
+  mode:
+    description: "Output mode: summary (step summary only), comment (PR comment only), both"
+    required: false
+    default: "both"
+
+outputs:
+  has_changes:
+    description: '"true" if any module has changes, "false" otherwise'
+  changes_json:
+    description: 'JSON array: [{ "module": "...", "toAdd": 0, "toChange": 1, "toDestroy": 0 }]'
+
+runs:
+  using: "node24"
+  main: "dist/index.js"
