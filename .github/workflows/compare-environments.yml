@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup terragrunt
-        uses: gruntwork-io/terragrunt-action@v2
+        uses: gruntwork-io/terragrunt-action@v3
         with:
           tf_version: "latest"
           tg_version: "latest"
