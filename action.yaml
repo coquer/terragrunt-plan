@@ -13,6 +13,10 @@ inputs:
     description: "Output mode: summary (step summary only), comment (PR comment only), both"
     required: false
     default: "both"
+  environment:
+    description: "Optional environment name. Added to the comment title; only comments for the same environment are updated"
+    required: false
+    default: ""
 
 outputs:
   has_changes:

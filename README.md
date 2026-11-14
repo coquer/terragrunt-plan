@@ -62,6 +62,7 @@ Filters out init logs, "No changes" modules, and terraform boilerplate. Only sho
 | `log_file` | ✅ | — | Path to the captured `terragrunt run --all plan` output |
 | `token` | — | `''` | GitHub token. Required for `comment` and `both` modes |
 | `mode` | — | `both` | `summary` · `comment` · `both` |
+| `environment` | — | `''` | Environment name, added to the comment title. Only the comment for the same environment is updated |
 
 ## Outputs
 
