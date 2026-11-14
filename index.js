@@ -8,7 +8,11 @@ const LINE_RE =
 const PLAN_SUMMARY_RE =
   /Plan:\s+(\d+)\s+to add,\s+(\d+)\s+to change,\s+(\d+)\s+to destroy/;
 
-const PR_COMMENT_MARKER = "<!-- terragrunt-diff -->";
+function commentMarker(environment) {
+  return environment
+    ? `<!-- terragrunt-diff:${environment} -->`
+    : "<!-- terragrunt-diff -->";
+}
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 function parseLog(raw) {
@@ -65,9 +69,13 @@ function parseLog(raw) {
   return changed;
 }
 
-function buildMarkdown(changes) {
+function buildMarkdown(changes, environment) {
+  const title = environment
+    ? `## Terragrunt Plan (${environment})`
+    : "## Terragrunt Plan";
+
   if (changes.length === 0) {
-    return "## Terragrunt Plan\n\n No changes detected across all modules.\n";
+    return `${title}\n\n No changes detected across all modules.\n`;
   }
 
   const totals = changes.reduce(
@@ -79,7 +87,7 @@ function buildMarkdown(changes) {
     { add: 0, change: 0, destroy: 0 },
   );
 
-  let md = "## Terragrunt Plan\n\n";
+  let md = `${title}\n\n`;
   md += `**${changes.length} module(s) with changes** — `;
   md += `${totals.add} to add, ${totals.change} to change, ${totals.destroy} to destroy\n\n`;
 
@@ -111,6 +119,8 @@ async function run() {
   const logFile = core.getInput("log_file", { required: true });
   const token = core.getInput("token");
   const mode = core.getInput("mode") || "both";
+  const environment = core.getInput("environment").trim();
+  const marker = commentMarker(environment);
 
   if (!fs.existsSync(logFile)) {
     core.setFailed(`Log file not found: ${logFile}`);
@@ -134,7 +144,7 @@ async function run() {
     ),
   );
 
-  const markdown = buildMarkdown(changes);
+  const markdown = buildMarkdown(changes, environment);
 
   if (mode === "summary" || mode === "both") {
     await core.summary.addRaw(markdown).write();
@@ -153,8 +163,8 @@ async function run() {
       issue_number: prNumber,
     });
 
-    const existing = comments.find((c) => c.body?.includes(PR_COMMENT_MARKER));
-    const body = `${PR_COMMENT_MARKER}\n${markdown}`;
+    const existing = comments.find((c) => c.body?.includes(marker));
+    const body = `${marker}\n${markdown}`;
 
     if (existing) {
       await octokit.rest.issues.updateComment({
