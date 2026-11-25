@@ -13,7 +13,8 @@ function commentMarker(environment) {
     ? `<!-- terragrunt-diff:${environment} -->`
     : "<!-- terragrunt-diff -->";
 }
-const ANSI_RE = /\x1b\[[0-9;]*m/g;
+// eslint-disable-next-line no-control-regex -- matching ANSI escape codes is intentional
+const ANSI_RE =/\x1b\[[0-9;]*m/g;
 
 function parseLog(raw) {
   const moduleAll = new Map();
@@ -156,32 +157,54 @@ async function run() {
     const octokit = github.getOctokit(token);
     const { owner, repo } = github.context.repo;
     const prNumber = github.context.payload.pull_request.number;
+    const headSha = github.context.payload.pull_request.head?.sha || "";
+    const shaMarker = `<!-- terragrunt-diff-sha:${headSha} -->`;
 
-    const { data: comments } = await octokit.rest.issues.listComments({
+    // Paginate: listComments only returns 30 comments per page by default.
+    const comments = await octokit.paginate(octokit.rest.issues.listComments, {
       owner,
       repo,
       issue_number: prNumber,
+      per_page: 100,
     });
 
-    const existing = comments.find((c) => c.body?.includes(marker));
-    const body = `${marker}\n${markdown}`;
+    const previous = comments.filter((c) => c.body?.includes(marker));
+    const body = `${marker}\n${shaMarker}\n${markdown}`;
+    const latest = previous.at(-1);
 
-    if (existing) {
+    if (latest && headSha && latest.body.includes(shaMarker)) {
+      // Re-run on the same commit: update the existing comment in place.
       await octokit.rest.issues.updateComment({
         owner,
         repo,
-        comment_id: existing.id,
+        comment_id: latest.id,
         body,
       });
-      core.info(`Updated PR comment #${existing.id}`);
+      core.info(`Updated PR comment #${latest.id}`);
     } else {
-      await octokit.rest.issues.createComment({
+      // New commit (push or force push): replace the old comment with a new
+      // one so the latest plan shows up at the bottom of the PR timeline.
+      for (const c of previous) {
+        try {
+          await octokit.rest.issues.deleteComment({
+            owner,
+            repo,
+            comment_id: c.id,
+          });
+          core.info(`Deleted previous PR comment #${c.id}`);
+        } catch (error) {
+          core.warning(
+            `Could not delete previous PR comment #${c.id}: ${error.message}`,
+          );
+        }
+      }
+      const { data: created } = await octokit.rest.issues.createComment({
         owner,
         repo,
         issue_number: prNumber,
         body,
       });
-      core.info("Created PR comment");
+      core.info(`Created PR comment #${created.id}`);
     }
   }
 }
