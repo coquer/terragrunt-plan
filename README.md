@@ -82,7 +82,7 @@ Use `has_changes` to gate a downstream apply step:
 
 ## PR comment behaviour
 
-When `mode` is `comment` or `both`, the action posts a comment on the open PR. On re-runs it **updates the same comment** instead of creating a new one.
+When `mode` is `comment` or `both`, the action posts a comment on the open PR. When new commits are pushed (including force pushes) the previous plan comment is **deleted and a fresh one is posted**, so the latest plan is always at the bottom of the PR. Re-running the workflow on the same commit **updates the existing comment** in place.
 
 Requires `pull-requests: write` permission on the job:
 
@@ -124,7 +124,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup terragrunt
         uses: gruntwork-io/terragrunt-action@v2
