@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/coquer/terragrunt-plan/compare/v1.1.0...v1.1.1) (2026-11-25)
+
+
+### Miscellaneous
+
+* deps upgrade ([25d8e36](https://github.com/coquer/terragrunt-plan/commit/25d8e361cb8eed19cfa682ebdd15d481d81d8f88))
+
 ## [1.1.0](https://github.com/coquer/terragrunt-plan/compare/v1.0.1...v1.1.0) (2026-11-25)
 
 
