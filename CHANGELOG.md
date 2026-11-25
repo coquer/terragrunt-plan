@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/coquer/terragrunt-plan/compare/v1.0.1...v1.1.0) (2026-11-25)
+
+
+### Features
+
+* add optional environment input ([b272d88](https://github.com/coquer/terragrunt-plan/commit/b272d888477ad1a3d2774e165b7d98099dd67c0d))
+
 ## [1.0.1](https://github.com/coquer/terragrunt-plan/compare/v1.0.0...v1.0.1) (2026-05-19)
 
 
